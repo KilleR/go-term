@@ -11,6 +11,12 @@ import (
 	"time"
 )
 
+type term struct {
+	width, height int
+}
+
+var terminal *term
+
 func isTerminal() bool {
 	fileInfo, _ := os.Stdout.Stat()
 	return (fileInfo.Mode() & os.ModeCharDevice) != 0
@@ -40,13 +46,16 @@ func consoleSize() (int, int) {
 	return heigth, width
 }
 
-var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890=+[]{}|~?$%&£#@")
 
 func main() {
+	terminal = new(term)
 	rand.Seed(time.Now().UnixNano())
 	if !isTerminal() {
 		log.Fatalln("Output is not a terminal. Terminating.")
 	}
+
+	terminal.height, terminal.width = consoleSize()
 
 	for i := 0; i < 25; i++ {
 		fmt.Print(string(letterRunes[rand.Intn(len(letterRunes))]))
