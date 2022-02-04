@@ -40,7 +40,6 @@ func consoleSize() (int, int) {
 	return heigth, width
 }
 
-
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
 
 func main() {
@@ -54,5 +53,5 @@ func main() {
 	}
 	fmt.Println()
 
-	numberGrid()
+	codeRain()
 }
