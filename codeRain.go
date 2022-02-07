@@ -11,6 +11,9 @@ const gridHeight = 15
 const gridWidth = 80
 const oldAge = 20
 const maxAge = 40
+const rippleWidth = 5
+
+var drawX, drawY int
 
 type activeRune struct {
 	x, y int
@@ -22,19 +25,30 @@ type gridRune struct {
 }
 
 func drawRain(grid [][]*gridRune) {
-	fmt.Print(ansi.RCP)
 	for y := 0; y < terminal.height; y++ {
 		for x := 0; x < terminal.width; x++ {
 			if grid[x][y] == nil {
 				continue
 			}
 			cellRune := grid[x][y]
-			if cellRune.age == 0 || cellRune.age == 1 || cellRune.age > maxAge || cellRune.age > oldAge {
-				if y > 0 {
-					fmt.Print(ansi.CUD(y))
+			if cellRune.age == 0 || cellRune.age == 1 || cellRune.age == maxAge || cellRune.age > oldAge {
+				offsetX := x - drawX
+				offsetY := y - drawY
+				if offsetY > 0 {
+					fmt.Print(ansi.CUD(offsetY))
+					drawY += offsetY
 				}
-				if x > 0 {
-					fmt.Print(ansi.CUF(x))
+				if offsetY < 0 {
+					fmt.Print(ansi.CUU(-offsetY))
+					drawY += offsetY
+				}
+				if offsetX > 0 {
+					fmt.Print(ansi.CUF(offsetX))
+					drawX += offsetX
+				}
+				if offsetX < 0 {
+					fmt.Print(ansi.CUB(-offsetX))
+					drawX += offsetX
 				}
 
 				var ansiColor string
@@ -44,17 +58,15 @@ func drawRain(grid [][]*gridRune) {
 				case 1:
 					ansiColor = ansi.RGB(0, 255, 0)
 				default:
-					if cellRune.age > oldAge {
-						ansiColor = ansi.RGB(0, 150, 0)
-					}
+					ansiColor = ansi.RGB(0, 150, 0)
 				}
+
 				if cellRune.age > maxAge {
-					fmt.Printf("%s%s", ansiColor, " ")
+					fmt.Printf("%s%s%s", ansiColor, " ", ansi.CUB(1))
 					grid[x][y] = nil
 				} else {
-					fmt.Printf("%s%s", ansiColor, string(cellRune.rune))
+					fmt.Printf("%s%s%s", ansiColor, string(cellRune.rune), ansi.CUB(1))
 				}
-				fmt.Print(ansi.RCP)
 			}
 			cellRune.age++
 		}
@@ -62,7 +74,7 @@ func drawRain(grid [][]*gridRune) {
 }
 
 func codeRain() {
-	defer fmt.Print(ansi.CUD(terminal.height))
+	defer fmt.Print(ansi.CUD(terminal.height - 1))
 
 	var activeRunes []*activeRune
 
@@ -75,14 +87,13 @@ func codeRain() {
 	}
 	fmt.Print(ansi.CUU(terminal.height), ansi.SCP)
 
+	activeRunes = append(activeRunes, &activeRune{
+		x: rand.Intn(terminal.width),
+		y: 0,
+	})
+
+drawLoop:
 	for {
-		//oldGrid := make([][]*gridRune, terminal.width)
-		//for x, g := range grid {
-		//	oldGrid[x] = make([]*gridRune, terminal.height)
-		//	for y, val := range g {
-		//		oldGrid[x][y] = val
-		////	}
-		//}
 
 		for i, ar := range activeRunes {
 			ar.y = ar.y + 1
@@ -97,12 +108,68 @@ func codeRain() {
 			x: rand.Intn(terminal.width),
 			y: 0,
 		})
-		activeRunes = append(activeRunes, &activeRune{
-			x: rand.Intn(terminal.width),
-			y: 0,
-		})
 
 		drawRain(grid)
-		time.Sleep(time.Millisecond * 50)
+		select {
+		case <-sigs:
+			break drawLoop
+		case <-time.After(time.Millisecond * 50):
+		}
+
 	}
+
+	//return
+	// ripple
+	for i := 0; i < 110; i++ {
+		rippleMinX := (50 + i/2 - rippleWidth) * terminal.width / 100
+		rippleMaxX := (50 + i/2 + rippleWidth) * terminal.width / 100
+		rippleMinY := (50 + i/2 - rippleWidth) * terminal.height / 100
+		rippleMaxY := (50 + i/2 + rippleWidth) * terminal.height / 100
+		ripple2MinX := (50 - i/2 - rippleWidth) * terminal.width / 100
+		ripple2MaxX := (50 - i/2 + rippleWidth) * terminal.width / 100
+		ripple2MinY := (50 - i/2 - rippleWidth) * terminal.height / 100
+		ripple2MaxY := (50 - i/2 + rippleWidth) * terminal.height / 100
+
+		for y := 0; y < terminal.height; y++ {
+			for x := 0; x < terminal.width; x++ {
+				if grid[x][y] == nil {
+					continue
+				}
+				cellRune := grid[x][y]
+
+				if y > 0 {
+					fmt.Print(ansi.CUD(y))
+				}
+				if x > 0 {
+					fmt.Print(ansi.CUF(x))
+				}
+
+				var ansiColor string
+				inRipple := (rippleMinX < x && x < rippleMaxX && y < rippleMaxY && ripple2MinY < y) ||
+					(rippleMinY < y && y < rippleMaxY && x < rippleMaxX && ripple2MinX < x) ||
+					(ripple2MinX < x && x < ripple2MaxX && y < rippleMaxY && ripple2MinY < y) ||
+					(ripple2MinY < y && y < ripple2MaxY && x < rippleMaxX && ripple2MinX < x)
+				switch age := cellRune.age; {
+				case age == 1 && inRipple:
+					ansiColor = ansi.WHITE
+				case age == 1, age > 1 && age <= oldAge && inRipple:
+					ansiColor = ansi.RGB(0, 255, 255)
+				case age > 1 && age <= oldAge, age > oldAge && inRipple:
+					ansiColor = ansi.RGB(0, 255, 0)
+				case age > oldAge:
+					ansiColor = ansi.RGB(0, 150, 0)
+				}
+
+				fmt.Printf("%s%s", ansiColor, string(cellRune.rune))
+				fmt.Print(ansi.RCP)
+			}
+		}
+
+	}
+	time.Sleep(time.Millisecond * 10)
+
+	boxTop := terminal.height/2 - 2
+	boxLeft := terminal.width/2 - 9
+	fmt.Printf("%s%s%s%s%s%s%s%s%s%s%s%s%s%s%s", ansi.CUD(boxTop), ansi.CUF(boxLeft), "╔════════════════╗", ansi.CUB(18), ansi.CUD(1), "║                ║", ansi.CUB(18), ansi.CUD(1), "║  SYSTEM ERROR  ║", ansi.CUB(18), ansi.CUD(1), "║                ║", ansi.CUB(18), ansi.CUD(1), "╚════════════════╝")
+
 }

@@ -1,14 +1,13 @@
 package main
 
 import (
-	"fmt"
 	"log"
-	"math/rand"
 	"os"
 	"os/exec"
+	"os/signal"
 	"strconv"
 	"strings"
-	"time"
+	"syscall"
 )
 
 type term struct {
@@ -48,19 +47,22 @@ func consoleSize() (int, int) {
 
 var letterRunes = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890=+[]{}|~?$%&£#@")
 
+var sigs chan os.Signal
+
+func init() {
+	sigs = make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
+}
+
 func main() {
+
 	terminal = new(term)
-	rand.Seed(time.Now().UnixNano())
+	//rand.Seed(time.Now().UnixNano())
 	if !isTerminal() {
 		log.Fatalln("Output is not a terminal. Terminating.")
 	}
 
 	terminal.height, terminal.width = consoleSize()
-
-	for i := 0; i < 25; i++ {
-		fmt.Print(string(letterRunes[rand.Intn(len(letterRunes))]))
-	}
-	fmt.Println()
 
 	codeRain()
 }
